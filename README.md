@@ -40,6 +40,11 @@ A comprehensive pool automation package for Home Assistant that provides intelli
   - Real-time power, voltage, and amperage display
   - Integration with Home Assistant Energy Dashboard
 
+### 📸 Screenshots
+
+![Main Dashboard](docs/screenshots/Dashboard%20Piscina.png)
+*Main dashboard with complete pool control*
+
 ### 📋 Requirements
 
 - Home Assistant OS/Supervised/Core 2024.12+
@@ -228,8 +233,8 @@ Free to use, modify, and distribute. Attribution appreciated but not required.
 
 ### 📞 Support
 
-- **Issues:** [GitHub Issues](https://github.com/yourusername/ha-pool-automation/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/ha-pool-automation/discussions)
+- **Issues:** [GitHub Issues](https://github.com/rgmerys/ha-pool-automation/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/rgmerys/ha-pool-automation/discussions)
 - **Home Assistant Community:** [Forum Thread](https://community.home-assistant.io/)
 
 ---
@@ -263,6 +268,11 @@ Free to use, modify, and distribute. Attribution appreciated but not required.
   - Seguimiento de consumo diario, mensual y anual
   - Visualización en tiempo real de potencia, voltaje y amperaje
   - Integración con Panel de Energía de Home Assistant
+
+### 📸 Capturas de Pantalla
+
+![Dashboard Principal](docs/screenshots/Dashboard%20Piscina.png)
+*Dashboard principal con control completo de piscina*
 
 ### 📋 Requisitos
 
