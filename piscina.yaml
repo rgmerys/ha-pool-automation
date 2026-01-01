@@ -1,0 +1,495 @@
+##################################################
+# PACKAGE: PISCINA
+# Helpers + Template moderno + Automatizaciones
+##################################################
+
+########################
+# INPUT_SELECT
+########################
+
+input_select:
+  piscina_bomba_modo:
+    name: "[Piscina] Modo de operación bomba"
+    options:
+      - "OFF"
+      - "Manual"
+      - "Automático"
+    initial: "Automático"
+    icon: mdi:cog
+
+########################
+# INPUT_BOOLEAN
+########################
+
+input_boolean:
+  piscina_bomba_habilitada:
+    name: "[Piscina] Bomba habilitada"
+
+  piscina_luz_habilitada:
+    name: "[Piscina] Luz habilitada"
+
+########################
+# INPUT_DATETIME
+########################
+
+input_datetime:
+  # Temporada verano editable desde dashboard
+  piscina_temporada_inicio:
+    name: "[Piscina] Inicio temporada verano"
+    has_date: true
+    has_time: false
+
+  piscina_temporada_fin:
+    name: "[Piscina] Fin temporada verano"
+    has_date: true
+    has_time: false
+
+  # Horarios bomba - verano
+  piscina_bomba_verano_inicio:
+    name: "[Piscina] Bomba verano - inicio"
+    has_date: false
+    has_time: true
+
+  piscina_bomba_verano_fin:
+    name: "[Piscina] Bomba verano - fin"
+    has_date: false
+    has_time: true
+
+  # Horarios bomba - fuera de verano
+  piscina_bomba_invierno_inicio:
+    name: "[Piscina] Bomba fuera verano - inicio"
+    has_date: false
+    has_time: true
+
+  piscina_bomba_invierno_fin:
+    name: "[Piscina] Bomba fuera verano - fin"
+    has_date: false
+    has_time: true
+
+  # NUEVO - Registro de cuándo entró en modo manual
+  piscina_bomba_en_manual_desde:
+    name: "[Piscina] Bomba en manual desde"
+    has_date: true
+    has_time: true
+
+########################
+# INPUT_NUMBER
+########################
+
+input_number:
+  piscina_luz_offset_sunset:
+    name: "[Piscina] Luz - minutos después del sunset"
+    min: 0
+    max: 180
+    step: 5
+    unit_of_measurement: min
+
+  piscina_luz_duracion:
+    name: "[Piscina] Luz - duración"
+    min: 5
+    max: 240
+    step: 5
+    unit_of_measurement: min
+
+  # NUEVO - Tiempo antes de volver a automático
+  piscina_manual_timeout_horas:
+    name: "[Piscina] Horas en manual antes de volver a automático"
+    min: 1
+    max: 72
+    step: 1
+    unit_of_measurement: h
+    initial: 24
+
+########################
+# TEMPLATE (MODERNO)
+########################
+
+template:
+  - sensor:
+      # Temporada (Verano/Fuera) automática
+      - name: "[Piscina] Temporada"
+        state: >
+          {% set hoy = now().replace(tzinfo=None) %}
+          {% set inicio = states('input_datetime.piscina_temporada_inicio') | as_datetime %}
+          {% set fin = states('input_datetime.piscina_temporada_fin') | as_datetime %}
+
+          {% if inicio and fin %}
+            {# Ajusta inicio y fin al año actual #}
+            {% set inicio_hoy = inicio.replace(year=hoy.year, tzinfo=None) %}
+            {% set fin_hoy = fin.replace(year=hoy.year, hour=23, minute=59, second=59, tzinfo=None) %}
+
+            {# Si la temporada cruza año nuevo #}
+            {% if fin_hoy.date() < inicio_hoy.date() %}
+              {% set fin_hoy = fin_hoy.replace(year=hoy.year + 1) %}
+            {% endif %}
+
+            {% if inicio_hoy <= hoy <= fin_hoy %}
+              Verano
+            {% else %}
+              Fuera de temporada
+            {% endif %}
+          {% else %}
+            Configurar fechas
+          {% endif %}
+
+      # Sensores para mostrar fechas DD/MM (solo visualización)
+      - name: "[Piscina] Inicio temporada (DD/MM)"
+        state: >
+          {% set inicio = states('input_datetime.piscina_temporada_inicio') | as_datetime %}
+          {% if inicio %}
+            {{ inicio.strftime('%d/%m') }}
+          {% else %}
+            No configurado
+          {% endif %}
+
+      - name: "[Piscina] Fin temporada (DD/MM)"
+        state: >
+          {% set fin = states('input_datetime.piscina_temporada_fin') | as_datetime %}
+          {% if fin %}
+            {{ fin.strftime('%d/%m') }}
+          {% else %}
+            No configurado
+          {% endif %}
+
+      # Sensor puente de energía (total)
+      - name: "[Piscina] Energía total"
+        unique_id: piscina_energia_total
+        state: "{{ states('sensor.disyuntor_piscina_energy') | float(0) }}"
+        unit_of_measurement: "kWh"
+        device_class: energy
+        state_class: total_increasing
+
+      # NUEVO - Mostrar fecha/hora legible cuando está en manual
+      - name: "[Piscina] En manual desde"
+        state: >
+          {% set modo = states('input_select.piscina_bomba_modo') %}
+          {% if modo == 'Manual' %}
+            {% set manual_desde = states('input_datetime.piscina_bomba_en_manual_desde') | as_datetime %}
+            {% if manual_desde and manual_desde.year > 1970 %}
+              {{ manual_desde.strftime('%d/%m/%Y %H:%M') }}
+            {% else %}
+              Calculando...
+            {% endif %}
+          {% else %}
+            -
+          {% endif %}
+
+      # NUEVO - Calcular tiempo restante en modo manual
+      - name: "[Piscina] Tiempo restante en manual"
+        unique_id: piscina_tiempo_restante_manual
+        state: >
+          {% set modo = states('input_select.piscina_bomba_modo') %}
+          {% if modo == 'Manual' %}
+            {% set manual_desde_str = states('input_datetime.piscina_bomba_en_manual_desde') %}
+            {% if manual_desde_str not in ['unknown', 'unavailable', ''] %}
+              {% set manual_desde = manual_desde_str | as_datetime %}
+              {% if manual_desde is not none and manual_desde.year > 1970 %}
+                {% set timeout_horas = states('input_number.piscina_manual_timeout_horas') | float(24) %}
+                {% set ahora = now().replace(tzinfo=None) %}
+                {% set manual_desde_naive = manual_desde.replace(tzinfo=None) %}
+                {% set limite = manual_desde_naive + timedelta(hours=timeout_horas) %}
+                {% set diferencia = (limite - ahora).total_seconds() %}
+                
+                {% if diferencia > 0 %}
+                  {% set horas = (diferencia // 3600) | int %}
+                  {% set minutos = ((diferencia % 3600) // 60) | int %}
+                  {{ '%d:%02d' | format(horas, minutos) }}
+                {% else %}
+                  Vencido
+                {% endif %}
+              {% else %}
+                Esperando...
+              {% endif %}
+            {% else %}
+              Esperando...
+            {% endif %}
+          {% else %}
+            -
+          {% endif %}
+        availability: >
+          {{ states('input_select.piscina_bomba_modo') not in ['unknown', 'unavailable'] }}
+
+########################
+# AUTOMATIZACIONES PISCINA
+########################
+
+automation:
+
+  # BOMBA - Control según modo seleccionado
+  - id: piscina_bomba_control_modo
+    alias: "[Piscina] Control bomba según modo"
+    mode: restart
+    trigger:
+      - trigger: time_pattern
+        minutes: "/1"
+      - trigger: state
+        entity_id: input_select.piscina_bomba_modo
+    action:
+      - choose:
+          # MODO OFF - Siempre apagada
+          - conditions:
+              - condition: state
+                entity_id: input_select.piscina_bomba_modo
+                state: "OFF"
+            sequence:
+              - service: switch.turn_off
+                target:
+                  entity_id: switch.sonoff_1001f68f89_1
+          
+          # MODO MANUAL - No hace nada, se controla manualmente
+          - conditions:
+              - condition: state
+                entity_id: input_select.piscina_bomba_modo
+                state: "Manual"
+            sequence: []
+          
+          # MODO AUTOMÁTICO - Sigue horarios
+          - conditions:
+              - condition: state
+                entity_id: input_select.piscina_bomba_modo
+                state: "Automático"
+              - condition: state
+                entity_id: input_boolean.piscina_bomba_habilitada
+                state: "on"
+            sequence:
+              - choose:
+                  # Verano
+                  - conditions:
+                      - condition: state
+                        entity_id: sensor.piscina_temporada
+                        state: "Verano"
+                      - condition: time
+                        after: input_datetime.piscina_bomba_verano_inicio
+                        before: input_datetime.piscina_bomba_verano_fin
+                    sequence:
+                      - service: switch.turn_on
+                        target:
+                          entity_id: switch.sonoff_1001f68f89_1
+                  # Fuera de temporada
+                  - conditions:
+                      - condition: state
+                        entity_id: sensor.piscina_temporada
+                        state: "Fuera de temporada"
+                      - condition: time
+                        after: input_datetime.piscina_bomba_invierno_inicio
+                        before: input_datetime.piscina_bomba_invierno_fin
+                    sequence:
+                      - service: switch.turn_on
+                        target:
+                          entity_id: switch.sonoff_1001f68f89_1
+                default:
+                  - service: switch.turn_off
+                    target:
+                      entity_id: switch.sonoff_1001f68f89_1
+        default: []
+
+  # BOMBA - Cambiar a modo Manual cuando se controla manualmente
+  - id: piscina_bomba_deteccion_control_manual
+    alias: "[Piscina] Detectar control manual de bomba"
+    mode: single
+    trigger:
+      - trigger: state
+        entity_id: switch.sonoff_1001f68f89_1
+        for: "00:00:02"
+    condition:
+      # Solo si está en modo Automático
+      - condition: state
+        entity_id: input_select.piscina_bomba_modo
+        state: "Automático"
+    action:
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.piscina_bomba_modo
+        data:
+          option: "Manual"
+      - service: persistent_notification.create
+        data:
+          title: "🔧 Bomba en Modo Manual"
+          message: >
+            La bomba se controló manualmente. Modo cambiado a "Manual".
+            Para volver a automático, cambia el modo en el dashboard.
+
+  # LUZ - Sunset + Offset + Duración
+  - id: piscina_luz_sunset_offset_duracion
+    alias: "[Piscina] Luz automática sunset con duración"
+    mode: restart
+    trigger:
+      - trigger: sun
+        event: sunset
+        id: trigger_sunset
+      - trigger: state
+        entity_id: input_boolean.piscina_luz_habilitada
+        to: "off"
+        id: trigger_disabled
+    condition:
+      - condition: state
+        entity_id: input_boolean.piscina_luz_habilitada
+        state: "on"
+    action:
+      - delay:
+          minutes: "{{ states('input_number.piscina_luz_offset_sunset') | int }}"
+      - service: switch.turn_on
+        target:
+          entity_id: switch.modulo_luz_piscina
+      - delay:
+          minutes: "{{ states('input_number.piscina_luz_duracion') | int }}"
+      - service: switch.turn_off
+        target:
+          entity_id: switch.modulo_luz_piscina
+
+  # LUZ - Apagar cuando se deshabilita
+  - id: piscina_luz_apagar_al_deshabilitar
+    alias: "[Piscina] Apagar luz al deshabilitar"
+    mode: single
+    trigger:
+      - trigger: state
+        entity_id: input_boolean.piscina_luz_habilitada
+        to: "off"
+    action:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.modulo_luz_piscina
+
+  # TEMPORADA - Actualización automática de fechas al año siguiente
+  - id: piscina_actualizar_temporada_automatica
+    alias: "[Piscina] Actualizar fechas de temporada al año siguiente"
+    mode: single
+    trigger:
+      - trigger: time
+        at: "23:59:50"
+    condition:
+      - condition: template
+        value_template: >
+          {% set hoy = now().replace(tzinfo=None) %}
+          {% set fin = states('input_datetime.piscina_temporada_fin') | as_datetime %}
+          {% set inicio = states('input_datetime.piscina_temporada_inicio') | as_datetime %}
+          
+          {% if fin and inicio %}
+            {% set fin_hoy = fin.replace(year=hoy.year, tzinfo=None) %}
+            {% set inicio_hoy = inicio.replace(year=hoy.year, tzinfo=None) %}
+            
+            {# Si la temporada cruza año nuevo, ajustar fin al año siguiente #}
+            {% if fin_hoy.date() < inicio_hoy.date() %}
+              {% set fin_hoy = fin.replace(year=hoy.year + 1, tzinfo=None) %}
+            {% endif %}
+            
+            {# Verificar si HOY es el último día de la temporada #}
+            {{ hoy.date() == fin_hoy.date() }}
+          {% else %}
+            false
+          {% endif %}
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.piscina_temporada_inicio
+        data:
+          datetime: >
+            {% set inicio = states('input_datetime.piscina_temporada_inicio') | as_datetime %}
+            {{ (inicio.replace(year=inicio.year + 1)).strftime('%Y-%m-%d') }}
+      - delay:
+          seconds: 2
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.piscina_temporada_fin
+        data:
+          datetime: >
+            {% set fin = states('input_datetime.piscina_temporada_fin') | as_datetime %}
+            {{ (fin.replace(year=fin.year + 1)).strftime('%Y-%m-%d') }}
+      - service: persistent_notification.create
+        data:
+          title: "Piscina - Temporada Actualizada"
+          message: >
+            Las fechas de temporada se han actualizado automáticamente al año siguiente
+
+  # BOMBA - Registrar entrada a modo manual
+  - id: piscina_bomba_registrar_manual
+    alias: "[Piscina] Registrar entrada a modo manual"
+    mode: single
+    trigger:
+      - trigger: state
+        entity_id: input_select.piscina_bomba_modo
+        to: "Manual"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.piscina_bomba_en_manual_desde
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+  # BOMBA - Volver a automático tras tiempo en manual
+  - id: piscina_bomba_volver_automatico
+    alias: "[Piscina] Volver a automático tras tiempo en manual"
+    mode: restart
+    trigger:
+      - trigger: state
+        entity_id: input_select.piscina_bomba_modo
+        to: "Manual"
+    action:
+      - delay:
+          hours: "{{ states('input_number.piscina_manual_timeout_horas') | int }}"
+      - condition: state
+        entity_id: input_select.piscina_bomba_modo
+        state: "Manual"
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.piscina_bomba_modo
+        data:
+          option: "Automático"
+      - service: persistent_notification.create
+        data:
+          title: "♻️ Bomba volvió a Automático"
+          message: >
+            La bomba estuvo en modo manual por más de
+            {{ states('input_number.piscina_manual_timeout_horas') | int }} horas.
+            El sistema volvió automáticamente al modo "Automático".
+
+  # BOMBA - Limpiar fecha manual al volver a automático
+  - id: piscina_bomba_limpiar_manual_desde
+    alias: "[Piscina] Limpiar fecha manual al volver a automático"
+    mode: single
+    trigger:
+      - trigger: state
+        entity_id: input_select.piscina_bomba_modo
+        to: "Automático"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.piscina_bomba_en_manual_desde
+        data:
+          datetime: "1970-01-01 00:00:00"
+
+  # TIEMPO RESTANTE - Forzar actualización cada minuto
+  - id: piscina_actualizar_tiempo_restante
+    alias: "[Piscina] Actualizar tiempo restante cada minuto"
+    mode: single
+    trigger:
+      - trigger: time_pattern
+        minutes: "*"
+    condition:
+      - condition: state
+        entity_id: input_select.piscina_bomba_modo
+        state: "Manual"
+    action:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.piscina_tiempo_restante_en_manual
+
+########################
+# CONSUMO ENERGETICO PISCINA
+########################
+
+utility_meter:
+  piscina_consumo_diario:
+    name: "[Piscina] Consumo diario"
+    source: sensor.disyuntor_piscina_energy
+    cycle: daily
+
+  piscina_consumo_mensual:
+    name: "[Piscina] Consumo mensual"
+    source: sensor.disyuntor_piscina_energy
+    cycle: monthly
+
+  piscina_consumo_anual:
+    name: "[Piscina] Consumo anual"
+    source: sensor.disyuntor_piscina_energy
+    cycle: yearly
