@@ -2,7 +2,95 @@
 
 ## Common Issues / Problemas Comunes
 
-### 1. Error: "undefined is not an object (evaluating 't.includes')"
+### 1. Season Detection Wrong (Crosses New Year) / Detección de Temporada Incorrecta (Cruza Año Nuevo)
+
+**Problem / Problema:**
+`sensor.piscina_temporada` shows "Fuera de temporada" when it should show "Verano", especially when the season crosses from one year to the next (e.g., Nov 2025 - Mar 2026).
+
+El sensor muestra "Fuera de temporada" cuando debería mostrar "Verano", especialmente cuando la temporada cruza de un año al siguiente (ej: Nov 2025 - Mar 2026).
+
+**Cause / Causa:**
+The template was incorrectly replacing the year in configured dates, breaking the logic for seasons that span across New Year.
+
+El template reemplazaba incorrectamente el año de las fechas configuradas, rompiendo la lógica para temporadas que cruzan el año nuevo.
+
+**Solution / Solución:**
+
+The current version (v1.0.1+) has this fixed. The template now uses the exact dates you configured without year replacement.
+
+La versión actual (v1.0.1+) tiene esto corregido. El template ahora usa las fechas exactas que configuraste sin reemplazo de año.
+
+**To verify it works / Para verificar que funciona:**
+
+Go to Developer Tools → Template and test:
+```yaml
+{% set hoy = now() %}
+{% set inicio = states('input_datetime.piscina_temporada_inicio') | as_datetime %}
+{% set fin = states('input_datetime.piscina_temporada_fin') | as_datetime %}
+
+Today: {{ hoy.date() }}
+Start: {{ inicio.date() if inicio else 'Not set' }}
+End: {{ fin.date() if fin else 'Not set' }}
+
+{% if inicio and fin %}
+  {% if fin.date() < inicio.date() %}
+    Crosses New Year: YES
+    In Season: {{ hoy.date() >= inicio.date() or hoy.date() <= fin.date() }}
+  {% else %}
+    Crosses New Year: NO
+    In Season: {{ inicio.date() <= hoy.date() <= fin.date() }}
+  {% endif %}
+{% endif %}
+```
+
+Should show "In Season: True" if you're currently in your swimming season.
+
+Debería mostrar "In Season: True" si estás actualmente en tu temporada de baño.
+
+---
+
+### 2. Pump Switches to Manual Mode Constantly / Bomba Cambia a Modo Manual Constantemente
+
+**Problem / Problema:**
+The pump switches from Automatic to Manual mode every minute, even when you haven't touched it manually. This creates an infinite loop.
+
+La bomba cambia de modo Automático a Manual cada minuto, incluso cuando no la has tocado manualmente. Esto crea un loop infinito.
+
+**Cause / Causa:**
+The manual override detection automation was triggering on ALL state changes, including changes made by the automation itself, creating a loop:
+```
+Automatic → Automation changes pump → Detects change → Switches to Manual → Repeat
+```
+
+La automatización de detección de override manual se disparaba con TODOS los cambios de estado, incluyendo cambios hechos por la automatización misma, creando un loop.
+
+**Solution / Solución:**
+
+The current version uses `context.user_id` to detect ONLY manual changes made by users in the UI:
+
+La versión actual usa `context.user_id` para detectar SOLO cambios manuales hechos por usuarios en la UI:
+
+```yaml
+condition:
+  - condition: state
+    entity_id: input_select.piscina_bomba_modo
+    state: "Automático"
+  - condition: template
+    value_template: "{{ trigger.to_state.context.user_id is not none }}"
+```
+
+This ensures the automation only switches to Manual when YOU toggle the switch, not when other automations do it.
+
+Esto asegura que la automatización solo cambie a Manual cuando TÚ cambies el switch, no cuando otras automatizaciones lo hagan.
+
+**Limitation / Limitación:**
+If you control the pump from the Sonoff app or a physical button (not through Home Assistant UI), it may not detect it as manual control since there's no `user_id`.
+
+Si controlas la bomba desde la app de Sonoff o un botón físico (no a través de la UI de Home Assistant), puede que no lo detecte como control manual ya que no hay `user_id`.
+
+---
+
+### 3. Error: "undefined is not an object (evaluating 't.includes')"
 
 **Problem / Problema:**
 This error appears in the automation description when viewing traces.
@@ -38,7 +126,7 @@ Cambia todos los triggers en tus automatizaciones de `platform:` a `trigger:`.
 
 ---
 
-### 2. Sensor shows "unavailable" / Sensor muestra "unavailable"
+### 4. Sensor shows "unavailable" / Sensor muestra "unavailable"
 
 **Problem / Problema:**
 `sensor.piscina_tiempo_restante_en_manual` shows as unavailable.
@@ -76,7 +164,7 @@ Si ves error de timezone, asegúrate que tu template incluya las líneas anterio
 
 ---
 
-### 3. Time remaining shows "unknown" / Tiempo restante muestra "unknown"
+### 5. Time remaining shows "unknown" / Tiempo restante muestra "unknown"
 
 **Problem / Problema:**
 Sensor exists but shows "unknown" instead of countdown.
@@ -113,7 +201,7 @@ El sensor existe pero muestra "unknown" en lugar de la cuenta regresiva.
 
 ---
 
-### 4. Dates showing as 1/1/1970
+### 6. Dates showing as 1/1/1970
 
 **Problem / Problema:**
 Dashboard shows 1/1/1970 for manual mode timestamp.
@@ -144,7 +232,7 @@ Cambia al sensor template que formatea la fecha correctamente.
 
 ---
 
-### 5. Pump doesn't follow schedule / Bomba no sigue el horario
+### 7. Pump doesn't follow schedule / Bomba no sigue el horario
 
 **Problem / Problema:**
 Pump doesn't turn on/off according to configured schedule.
@@ -197,7 +285,7 @@ La bomba no se enciende/apaga según el horario configurado.
 
 ---
 
-### 6. Manual mode doesn't auto-detect / Modo manual no se detecta automáticamente
+### 8. Manual mode doesn't auto-detect / Modo manual no se detecta automáticamente
 
 **Problem / Problema:**
 When you manually toggle the pump, it doesn't switch to Manual mode.
@@ -231,7 +319,7 @@ La automatización de detección está deshabilitada o tiene configuración inco
 
 ---
 
-### 7. Season not updating / Temporada no se actualiza
+### 9. Season not updating / Temporada no se actualiza
 
 **Problem / Problema:**
 `sensor.piscina_temporada` shows wrong season or "Configurar fechas".
@@ -269,7 +357,7 @@ La automatización de detección está deshabilitada o tiene configuración inco
 
 ---
 
-### 8. Template syntax errors / Errores de sintaxis de template
+### 10. Template syntax errors / Errores de sintaxis de template
 
 **Common Template Errors / Errores Comunes de Template:**
 
@@ -297,7 +385,7 @@ La automatización de detección está deshabilitada o tiene configuración inco
 
 ---
 
-### 9. Energy monitoring not working / Monitoreo de energía no funciona
+### 11. Energy monitoring not working / Monitoreo de energía no funciona
 
 **Problem / Problema:**
 Energy sensors show unavailable or incorrect values.
@@ -330,7 +418,7 @@ Comment out or remove utility_meter section:
 
 ---
 
-### 10. Lights not turning on at sunset / Luces no se encienden al atardecer
+### 12. Lights not turning on at sunset / Luces no se encienden al atardecer
 
 **Problem / Problema:**
 Pool lights don't turn on automatically at sunset.
