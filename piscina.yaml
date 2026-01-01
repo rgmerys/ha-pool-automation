@@ -109,24 +109,30 @@ template:
       # Temporada (Verano/Fuera) automática
       - name: "[Piscina] Temporada"
         state: >
-          {% set hoy = now().replace(tzinfo=None) %}
+          {% set hoy = now() %}
           {% set inicio = states('input_datetime.piscina_temporada_inicio') | as_datetime %}
           {% set fin = states('input_datetime.piscina_temporada_fin') | as_datetime %}
 
           {% if inicio and fin %}
-            {# Ajusta inicio y fin al año actual #}
-            {% set inicio_hoy = inicio.replace(year=hoy.year, tzinfo=None) %}
-            {% set fin_hoy = fin.replace(year=hoy.year, hour=23, minute=59, second=59, tzinfo=None) %}
+            {# Convertir a objetos datetime conscientes de timezone #}
+            {% set inicio_dt = inicio.replace(hour=0, minute=0, second=0) %}
+            {% set fin_dt = fin.replace(hour=23, minute=59, second=59) %}
 
-            {# Si la temporada cruza año nuevo #}
-            {% if fin_hoy.date() < inicio_hoy.date() %}
-              {% set fin_hoy = fin_hoy.replace(year=hoy.year + 1) %}
-            {% endif %}
-
-            {% if inicio_hoy <= hoy <= fin_hoy %}
-              Verano
+            {# Si la fecha de fin es menor que la de inicio, cruza año nuevo #}
+            {% if fin_dt.date() < inicio_dt.date() %}
+              {# Temporada cruza año nuevo #}
+              {% if hoy.date() >= inicio_dt.date() or hoy.date() <= fin_dt.date() %}
+                Verano
+              {% else %}
+                Fuera de temporada
+              {% endif %}
             {% else %}
-              Fuera de temporada
+              {# Temporada normal dentro del mismo año #}
+              {% if inicio_dt.date() <= hoy.date() <= fin_dt.date() %}
+                Verano
+              {% else %}
+                Fuera de temporada
+              {% endif %}
             {% endif %}
           {% else %}
             Configurar fechas
@@ -224,6 +230,10 @@ automation:
         minutes: "/1"
       - trigger: state
         entity_id: input_select.piscina_bomba_modo
+      - trigger: state
+        entity_id: input_boolean.piscina_bomba_habilitada
+      - trigger: state
+        entity_id: sensor.piscina_temporada
     action:
       - choose:
           # MODO OFF - Siempre apagada
@@ -253,7 +263,7 @@ automation:
                 state: "on"
             sequence:
               - choose:
-                  # Verano
+                  # Verano - dentro del horario
                   - conditions:
                       - condition: state
                         entity_id: sensor.piscina_temporada
@@ -265,7 +275,7 @@ automation:
                       - service: switch.turn_on
                         target:
                           entity_id: switch.sonoff_1001f68f89_1
-                  # Fuera de temporada
+                  # Fuera de temporada - dentro del horario
                   - conditions:
                       - condition: state
                         entity_id: sensor.piscina_temporada
@@ -278,6 +288,7 @@ automation:
                         target:
                           entity_id: switch.sonoff_1001f68f89_1
                 default:
+                  # Fuera de horario - apagar
                   - service: switch.turn_off
                     target:
                       entity_id: switch.sonoff_1001f68f89_1
@@ -292,10 +303,12 @@ automation:
         entity_id: switch.sonoff_1001f68f89_1
         for: "00:00:02"
     condition:
-      # Solo si está en modo Automático
       - condition: state
         entity_id: input_select.piscina_bomba_modo
         state: "Automático"
+      # CRÍTICO: Solo detectar cambios manuales del usuario, no de automatizaciones
+      - condition: template
+        value_template: "{{ trigger.to_state.context.user_id is not none }}"
     action:
       - service: input_select.select_option
         target:
