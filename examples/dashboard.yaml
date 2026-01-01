@@ -1,0 +1,73 @@
+title: Piscina
+views:
+  - title: Control Piscina
+    path: control
+    icon: mdi:pool
+    badges: []
+    cards:
+      - type: entities
+        title: Estado General
+        show_header_toggle: false
+        entities:
+          - entity: sensor.piscina_temporada
+            name: Temporada actual
+          - entity: input_boolean.piscina_bomba_habilitada
+            name: Bomba habilitada
+          - entity: input_boolean.piscina_luz_habilitada
+            name: Luz habilitada
+          - entity: input_select.piscina_bomba_modo
+            name: Modo de operación
+      - type: entities
+        title: Bomba Piscina
+        show_header_toggle: false
+        entities:
+          - entity: switch.sonoff_1001f68f89_1
+            name: Estado bomba
+          - type: section
+            label: Horario Verano
+          - entity: input_datetime.piscina_bomba_verano_inicio
+            name: Inicio
+          - entity: input_datetime.piscina_bomba_verano_fin
+            name: Fin
+          - type: section
+            label: Horario Fuera de Temporada
+          - entity: input_datetime.piscina_bomba_invierno_inicio
+            name: Inicio
+          - entity: input_datetime.piscina_bomba_invierno_fin
+            name: Fin
+          - type: section
+            label: Modo Manual
+          - entity: input_number.piscina_manual_timeout_horas
+            name: Volver a automático tras (horas)
+          - entity: sensor.piscina_en_manual_desde
+            name: En manual desde
+          - entity: sensor.piscina_tiempo_restante_en_manual
+            name: Tiempo restante
+      - type: entities
+        title: Luz Piscina
+        show_header_toggle: false
+        entities:
+          - entity: switch.modulo_luz_piscina
+            name: Estado luz
+          - entity: input_number.piscina_luz_offset_sunset
+            name: Minutos después del sunset
+          - entity: input_number.piscina_luz_duracion
+            name: Duración encendida (min)
+      - type: entities
+        title: Energía Piscina
+        show_header_toggle: false
+        entities:
+          - entity: sensor.disyuntor_piscina_current
+            name: Corriente (A)
+          - entity: sensor.disyuntor_piscina_power
+            name: Potencia (W)
+          - entity: sensor.disyuntor_piscina_voltage
+            name: Voltaje (V)
+      - type: entities
+        title: Configuración Temporada Verano
+        show_header_toggle: false
+        entities:
+          - entity: input_datetime.piscina_temporada_inicio
+            name: Inicio temporada
+          - entity: input_datetime.piscina_temporada_fin
+            name: Fin temporada
