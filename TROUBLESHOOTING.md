@@ -447,4 +447,4 @@ Antes de pedir ayuda, verifica:
 
 - 📖 [Documentation](../README.md)
 - 💬 [Community Forum](https://community.home-assistant.io/)
-- 🐛 [Report Bug](https://github.com/rmerys/ha-pool-automation/issues)
+- 🐛 [Report Bug](https://github.com/rgmerys/ha-pool-automation/issues)
