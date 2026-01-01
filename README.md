@@ -452,8 +452,8 @@ Libre para usar, modificar y distribuir. Atribución apreciada pero no requerida
 
 ### 📞 Soporte
 
-- **Issues:** [GitHub Issues](https://github.com/rmerys/ha-pool-automation/issues)
-- **Discusiones:** [GitHub Discussions](https://github.com/rmerys/ha-pool-automation/discussions)
+- **Issues:** [GitHub Issues](https://github.com/rgmerys/ha-pool-automation/issues)
+- **Discusiones:** [GitHub Discussions](https://github.com/rgmerys/ha-pool-automation/discussions)
 - **Comunidad Home Assistant:** [Hilo del Foro](https://community.home-assistant.io/)
 
 ---
