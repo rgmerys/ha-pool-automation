@@ -534,5 +534,5 @@ Antes de pedir ayuda, verifica:
 **Need more help? / ¿Necesitas más ayuda?**
 
 - 📖 [Documentation](../README.md)
-- 💬 [Community Forum](https://community.home-assistant.io/)
+- 💬 [Community Forum](https://community.home-assistant.io/t/complete-pool-automation-package-seasonal-schedules-manual-override-energy-monitoring/969037)
 - 🐛 [Report Bug](https://github.com/rgmerys/ha-pool-automation/issues)
