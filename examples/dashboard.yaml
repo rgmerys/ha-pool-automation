@@ -63,11 +63,11 @@ views:
             name: Potencia (W)
           - entity: sensor.disyuntor_piscina_voltage
             name: Voltaje (V)
+          - entity: sensor.piscina_consumo_diario
+            name: Consumo Hoy
+          - entity: sensor.piscina_consumo_mensual
+            name: Consumo Este Mes
+          - entity: sensor.piscina_consumo_anual
+            name: Consumo Este Año
       - type: entities
         title: Configuración Temporada Verano
-        show_header_toggle: false
-        entities:
-          - entity: input_datetime.piscina_temporada_inicio
-            name: Inicio temporada
-          - entity: input_datetime.piscina_temporada_fin
-            name: Fin temporada
