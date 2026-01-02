@@ -234,8 +234,7 @@ Free to use, modify, and distribute. Attribution appreciated but not required.
 ### 📞 Support
 
 - **Issues:** [GitHub Issues](https://github.com/rgmerys/ha-pool-automation/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/rgmerys/ha-pool-automation/discussions)
-- **Home Assistant Community:** [Forum Thread](https://community.home-assistant.io/)
+- **Home Assistant Community:** [Forum Thread](https://community.home-assistant.io/t/complete-pool-automation-package-seasonal-schedules-manual-override-energy-monitoring/969037)
 
 ---
 
@@ -463,8 +462,7 @@ Libre para usar, modificar y distribuir. Atribución apreciada pero no requerida
 ### 📞 Soporte
 
 - **Issues:** [GitHub Issues](https://github.com/rgmerys/ha-pool-automation/issues)
-- **Discusiones:** [GitHub Discussions](https://github.com/rgmerys/ha-pool-automation/discussions)
-- **Comunidad Home Assistant:** [Hilo del Foro](https://community.home-assistant.io/)
+- **Comunidad Home Assistant:** [Hilo del Foro](https://community.home-assistant.io/t/complete-pool-automation-package-seasonal-schedules-manual-override-energy-monitoring/969037)
 
 ---
 
