@@ -28,6 +28,10 @@ input_boolean:
   piscina_luz_habilitada:
     name: "[Piscina] Luz habilitada"
 
+  piscina_control_automatico_activo:
+    name: "[Piscina] Control automático activo"
+    initial: false
+
 ########################
 # INPUT_DATETIME
 ########################
@@ -108,6 +112,7 @@ template:
   - sensor:
       # Temporada (Verano/Fuera) automática
       - name: "[Piscina] Temporada"
+        unique_id: piscina_temporada
         state: >
           {% set hoy = now() %}
           {% set inicio = states('input_datetime.piscina_temporada_inicio') | as_datetime %}
@@ -167,6 +172,7 @@ template:
 
       # NUEVO - Mostrar fecha/hora legible cuando está en manual
       - name: "[Piscina] En manual desde"
+        unique_id: piscina_en_manual_desde
         state: >
           {% set modo = states('input_select.piscina_bomba_modo') %}
           {% if modo == 'Manual' %}
@@ -242,16 +248,27 @@ automation:
                 entity_id: input_select.piscina_bomba_modo
                 state: "OFF"
             sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.piscina_control_automatico_activo
               - service: switch.turn_off
                 target:
                   entity_id: switch.sonoff_1001f68f89_1
+              - delay:
+                  seconds: 5
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.piscina_control_automatico_activo
           
           # MODO MANUAL - No hace nada, se controla manualmente
           - conditions:
               - condition: state
                 entity_id: input_select.piscina_bomba_modo
                 state: "Manual"
-            sequence: []
+            sequence:
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.piscina_control_automatico_activo
           
           # MODO AUTOMÁTICO - Sigue horarios
           - conditions:
@@ -262,6 +279,9 @@ automation:
                 entity_id: input_boolean.piscina_bomba_habilitada
                 state: "on"
             sequence:
+              - service: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.piscina_control_automatico_activo
               - choose:
                   # Verano - dentro del horario
                   - conditions:
@@ -275,6 +295,8 @@ automation:
                       - service: switch.turn_on
                         target:
                           entity_id: switch.sonoff_1001f68f89_1
+                      - delay:
+                          seconds: 5
                   # Fuera de temporada - dentro del horario
                   - conditions:
                       - condition: state
@@ -287,12 +309,22 @@ automation:
                       - service: switch.turn_on
                         target:
                           entity_id: switch.sonoff_1001f68f89_1
+                      - delay:
+                          seconds: 5
                 default:
                   # Fuera de horario - apagar
                   - service: switch.turn_off
                     target:
                       entity_id: switch.sonoff_1001f68f89_1
-        default: []
+                  - delay:
+                      seconds: 5
+              - service: input_boolean.turn_off
+                target:
+                  entity_id: input_boolean.piscina_control_automatico_activo
+        default:
+          - service: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.piscina_control_automatico_activo
 
   # BOMBA - Cambiar a modo Manual cuando se controla manualmente
   - id: piscina_bomba_deteccion_control_manual
@@ -306,9 +338,10 @@ automation:
       - condition: state
         entity_id: input_select.piscina_bomba_modo
         state: "Automático"
-      # CRÍTICO: Solo detectar cambios manuales del usuario, no de automatizaciones
-      - condition: template
-        value_template: "{{ trigger.to_state.context.user_id is not none }}"
+      # CRÍTICO: Solo detectar cambios que NO vienen de la automatización de control
+      - condition: state
+        entity_id: input_boolean.piscina_control_automatico_activo
+        state: "off"
     action:
       - service: input_select.select_option
         target:
@@ -319,7 +352,8 @@ automation:
         data:
           title: "🔧 Bomba en Modo Manual"
           message: >
-            La bomba se controló manualmente. Modo cambiado a "Manual".
+            La bomba se controló manualmente ({{ trigger.to_state.state }}).
+            Modo cambiado a "Manual".
             Para volver a automático, cambia el modo en el dashboard.
 
   # LUZ - Sunset + Offset + Duración
@@ -470,6 +504,36 @@ automation:
           entity_id: input_datetime.piscina_bomba_en_manual_desde
         data:
           datetime: "1970-01-01 00:00:00"
+
+  # BOMBA - Volver a Automático cuando se apaga manualmente
+  - id: piscina_bomba_volver_automatico_al_apagar
+    alias: "[Piscina] Volver a Automático al apagar manualmente"
+    mode: single
+    trigger:
+      - trigger: state
+        entity_id: switch.sonoff_1001f68f89_1
+        to: "off"
+        for: "00:00:02"
+    condition:
+      - condition: state
+        entity_id: input_select.piscina_bomba_modo
+        state: "Manual"
+      # Verificar que NO fue apagado por la automatización de control
+      - condition: state
+        entity_id: input_boolean.piscina_control_automatico_activo
+        state: "off"
+    action:
+      - service: input_select.select_option
+        target:
+          entity_id: input_select.piscina_bomba_modo
+        data:
+          option: "Automático"
+      - service: persistent_notification.create
+        data:
+          title: "♻️ Bomba volvió a Automático"
+          message: >
+            La bomba se apagó manualmente.
+            Modo cambiado a "Automático".
 
   # TIEMPO RESTANTE - Forzar actualización cada minuto
   - id: piscina_actualizar_tiempo_restante
